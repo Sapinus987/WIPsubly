@@ -1,99 +1,99 @@
 # 🦄 Subly
 
-Real-time **Russian → French** subtitle overlay for Twitch streams.
+Real-time subtitle overlay for Twitch streams.  
+Subly listens to a stream, transcribes the speech with Whisper and translates it with DeepL — all displayed in a floating window on your screen.
 
-Subly is split into two parts:
-- **Server** — captures Twitch streams, transcribes speech with Whisper and translates with DeepL
-- **Client** — lightweight overlay UI, connects to the server via WebSocket, no GPU required
+**Supported input languages:** Russian 🇷🇺, Ukrainian 🇺🇦  
+**Supported output languages:** French 🇫🇷, English 🇬🇧
 
 ---
 
-## Architecture
+## How it works
+
+Subly is split into two parts:
+
+| Part | Role | Machine required |
+|------|------|-----------------|
+| **Server** | Captures the stream, transcribes speech, calls DeepL | Windows PC with NVIDIA GPU |
+| **Client** | Displays the subtitle overlay | Any machine (no GPU needed) |
+
+Both parts can run on the **same machine**, or on separate machines on the same network.
 
 ```
-┌─────────────────────────────────┐        ┌─────────────────────────────┐
-│  Server  (GPU machine)          │        │  Client  (any machine)      │
-│                                 │        │                             │
-│  Whisper large-v3  (STT)        │◄──WS──►│  PyQt5 overlay UI           │
-│  DeepL API         (translate)  │        │  Enter channel → subtitles  │
-│  streamlink + ffmpeg            │        │                             │
-└─────────────────────────────────┘        └─────────────────────────────┘
+Twitch stream
+     ↓
+ Whisper large-v3   (speech → text)
+     ↓
+ DeepL API          (text → translation)
+     ↓
+ Client overlay     (displays subtitles)
 ```
-
-Both can run on the **same machine** (use `ws://localhost:8765`) or on separate machines over a local network.
 
 ---
 
 ## Requirements
 
-### Server
-| Component | Minimum |
-|-----------|---------|
+### Server machine
+| | Minimum |
+|-|---------|
 | OS | Windows 10/11 64-bit |
-| GPU | NVIDIA with CUDA support |
-| VRAM | ~2 GB (Whisper large-v3 only) |
-| Python | 3.10+ |
-| DeepL API key | Free account — see below |
+| GPU | NVIDIA (CUDA-compatible) |
+| VRAM | 2 GB |
+| RAM | 8 GB |
+| Python | 3.10 or higher |
+| Internet | Required (Twitch + DeepL API) |
 
-### Client
-| Component | Minimum |
-|-----------|---------|
-| OS | Windows / macOS / Linux |
-| Python | 3.10+ |
+### Client machine
+| | Minimum |
+|-|---------|
+| OS | Windows, macOS or Linux |
+| Python | 3.10 or higher |
 | GPU | Not required |
 
 ---
 
-## DeepL API key (required)
+## Step 1 — Get a free DeepL API key
 
-Subly uses [DeepL](https://www.deepl.com) for Russian → French translation.
+Subly uses [DeepL](https://www.deepl.com) for translation. The **free plan gives 1,000,000 characters per year**, which is more than enough for personal use.
 
-**The free plan includes 1,000,000 characters/year** — more than enough for personal streaming use.
-
-### How to get your free API key
+**How to get your key:**
 
 1. Go to **[deepl.com/pro#developer](https://www.deepl.com/pro#developer)**
-2. Click **"Sign up for free"**
-3. Create an account (no credit card required for the free plan)
-4. Once logged in, go to **Account → API Keys**
-5. Copy your API key — it looks like: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx:fx`
+2. Click **"Sign up for free"** — no credit card required
+3. Once logged in, open **Account → API Keys**
+4. Copy your key — it looks like: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx:fx`
 
-### Save your key
+**Save your key:**
 
-Create a file called `deepl.key` inside the `server/` folder and paste your key on a single line:
+Create a file named `deepl.key` inside the `server/` folder and paste your key on a single line:
 
 ```
 server/
-└── deepl.key   ← create this file, paste your key inside
+└── deepl.key   ← create this file and paste your key inside
 ```
 
-> ⚠️ Never share this file or commit it to a repository. It is already listed in `.gitignore`.
+> ⚠️ Never share this file or upload it anywhere. It is excluded from version control by `.gitignore`.
 
 ---
 
-## Models
+## Step 2 — Install the server
 
-| Role | Model |
-|------|-------|
-| Speech-to-text | [Systran/faster-whisper-large-v3](https://huggingface.co/Systran/faster-whisper-large-v3) |
-| Translation | [DeepL API](https://www.deepl.com/docs-api) |
-
-Whisper is downloaded automatically on first server launch (~3 GB).
-
----
-
-## Installation
-
-### Server (GPU machine)
+Run this once on the machine that has the GPU:
 
 ```bat
 cd server
 install.bat
 ```
 
-Then create your `server/deepl.key` file with your DeepL API key.
+This will automatically install all dependencies and download ffmpeg.
 
-### Client (any machine)
+The Whisper model (~3 GB) will be downloaded on the **first launch** of the server.
+
+---
+
+## Step 3 — Install the client
+
+Run this once on the machine that will display the subtitles (can be the same machine):
 
 ```bat
 cd client
@@ -102,33 +102,52 @@ install.bat
 
 ---
 
-## Usage
-
-### 1 — Start the server
+## Step 4 — Start the server
 
 ```bat
 cd server
 launch.bat
 ```
 
-Wait for:
+Wait until you see this message before connecting any client:
+
 ```
 [Subly] Serveur pret.
 INFO:     Uvicorn running on http://0.0.0.0:8765
 ```
 
-### 2 — Start the client
+---
+
+## Step 5 — Start the client
 
 ```bat
 cd client
 launch.bat
 ```
 
-### 3 — Add a channel
+The control panel opens. The interface language is automatically set based on your system language (French or English).
 
-- If client and server are on the **same machine**: leave the server field as `ws://localhost:8765`
-- If on **separate machines**: replace `localhost` with the server's local IP (e.g. `ws://192.168.1.10:8765`)
-- Enter a Twitch channel name and press **+**
+---
+
+## Step 6 — Add a channel
+
+1. **Server field** — leave `ws://localhost:8765` if the server is on the same machine. If on another machine, replace `localhost` with its local IP address (e.g. `ws://192.168.1.10:8765`)
+2. **Stream language** — choose the language spoken on the stream (Russian or Ukrainian)
+3. **Translation language** — choose your target language (French or English)
+4. **Channel name** — enter a Twitch channel name and press **+**
+
+A subtitle overlay appears on your screen for that channel.
+
+---
+
+## Overlay controls
+
+| Action | How |
+|--------|-----|
+| Move | Drag anywhere on the overlay |
+| Resize | Bottom-right corner grip |
+| Reduce opacity | Orange button (top-left) |
+| Close | Red button (top-left) |
 
 ---
 
@@ -137,17 +156,33 @@ launch.bat
 ```
 Subly/
 ├── server/
-│   ├── server.py       # FastAPI + WebSocket + Whisper + DeepL
-│   ├── deepl.key       # Your DeepL API key (create this file, never commit it)
-│   ├── install.bat     # Server dependencies
-│   └── launch.bat      # Start server
+│   ├── server.py       # Backend: Whisper + DeepL + WebSocket
+│   ├── deepl.key       # Your DeepL API key — create this file yourself
+│   ├── install.bat     # Install server dependencies
+│   └── launch.bat      # Start the server
 ├── client/
-│   ├── client.py       # PyQt5 overlay UI
-│   ├── install.bat     # Client dependencies (PyQt5 + websockets only)
-│   └── launch.bat      # Start client
-├── benchmark.py        # Benchmark translation models vs DeepL
+│   ├── client.py       # Frontend: PyQt5 overlay UI
+│   ├── install.bat     # Install client dependencies
+│   └── launch.bat      # Start the client
+├── benchmark.py        # Tool to compare translation models
 └── .gitignore
 ```
+
+---
+
+## Troubleshooting
+
+**The overlay shows nothing when the stream is silent**  
+→ This is normal. Subly uses voice detection (VAD) and only translates when speech is detected.
+
+**"Connection refused" error in the client**  
+→ Make sure the server is fully started (wait for `Serveur pret.`) before launching the client.
+
+**"deepl.key not found" error**  
+→ Create the file `server/deepl.key` and paste your DeepL API key inside.
+
+**The server crashes on startup**  
+→ Make sure your NVIDIA drivers are up to date and that CUDA is available (`nvidia-smi` in a terminal).
 
 ---
 

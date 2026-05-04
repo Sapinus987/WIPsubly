@@ -13,7 +13,7 @@ import threading
 
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QLabel, QLineEdit, QPushButton,
-    QSlider, QVBoxLayout, QHBoxLayout, QFrame, QSizeGrip,
+    QSlider, QVBoxLayout, QHBoxLayout, QFrame, QSizeGrip, QComboBox,
 )
 from PyQt5.QtCore import Qt, pyqtSignal, QObject, QRectF
 from PyQt5.QtGui import (
@@ -25,6 +25,55 @@ from PyQt5.QtGui import (
 _BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
 _TWITCH_RE  = re.compile(r"^[a-zA-Z0-9_]{1,25}$")
 DEFAULT_URL = "ws://localhost:8765"
+
+# ── Localisation UI ────────────────────────────────────────────────────────────
+def _detect_ui_lang() -> str:
+    """Retourne 'fr' si la langue système est française, 'en' sinon."""
+    from PyQt5.QtCore import QLocale
+    code = QLocale.system().name()          # ex: 'fr_FR', 'en_US', 'de_DE'
+    return "fr" if code.startswith("fr") else "en"
+
+_UI_STRINGS = {
+    "fr": {
+        "server":        "Serveur",
+        "source_lang":   "Langue du stream",
+        "trans_lang":    "Langue de traduction",
+        "add_channel":   "Ajouter une chaîne",
+        "placeholder":   "ex: b_a_s_y_a",
+        "active":        "Sessions actives",
+        "none":          "Aucune session",
+        "text_size":     "Taille du texte",
+        "stop_all":      "■  Tout arrêter",
+        "status_idle":   "● Connecté · aucune session",
+        "status_n":      "● Connecté · {n} session{s} active{s}",
+        "connecting":    "Connexion...",
+        "err_connect":   "Connexion impossible",
+        "err_generic":   "Erreur",
+    },
+    "en": {
+        "server":        "Server",
+        "source_lang":   "Stream language",
+        "trans_lang":    "Translation language",
+        "add_channel":   "Add a channel",
+        "placeholder":   "e.g. b_a_s_y_a",
+        "active":        "Active sessions",
+        "none":          "No session",
+        "text_size":     "Text size",
+        "stop_all":      "■  Stop all",
+        "status_idle":   "● Connected · no session",
+        "status_n":      "● Connected · {n} active session{s}",
+        "connecting":    "Connecting...",
+        "err_connect":   "Connection failed",
+        "err_generic":   "Error",
+    },
+}
+
+UI_LANG = _detect_ui_lang()
+
+def tr(key: str, **kwargs) -> str:
+    """Retourne la chaîne traduite pour la langue UI détectée."""
+    s = _UI_STRINGS[UI_LANG].get(key, key)
+    return s.format(**kwargs) if kwargs else s
 
 # ── Palette ────────────────────────────────────────────────────────────────────
 BG       = "#0e0e10"
@@ -168,7 +217,7 @@ class OverlayWindow(QWidget):
         bl.addSpacing(44)
         root.addWidget(bar)
 
-        self.text_lbl = QLabel(f"[{self.channel}]  Connexion...")
+        self.text_lbl = QLabel(f"[{self.channel}]  {tr('connecting')}")
         self.text_lbl.setFont(QFont(FONT, font_size))
         self.text_lbl.setStyleSheet(f"color: {FG}; background: transparent;")
         self.text_lbl.setWordWrap(True)
@@ -224,16 +273,31 @@ class OverlayWindow(QWidget):
 # ══════════════════════════════════════════════════════════════════════════════
 #  WebSocketSession — connexion WebSocket vers le serveur pour une chaîne
 # ══════════════════════════════════════════════════════════════════════════════
+# Langues source : (code Whisper, code DeepL)
+SOURCE_LANGUAGES = {
+    "Русский":    ("ru", "RU"),
+    "Українська": ("uk", "UK"),
+}
+
+# Langues cibles : code DeepL
+TARGET_LANGUAGES = {
+    "Français": "FR",
+    "English":  "EN-US",
+}
+
 class WebSocketSession(QObject):
     text_signal = pyqtSignal(str)
 
     def __init__(self, channel: str, index: int, font_size: int,
-                 panel: "ControlPanel", server_url: str):
+                 panel: "ControlPanel", server_url: str,
+                 source_lang: str = "RU", target_lang: str = "FR"):
         super().__init__()
-        self.channel     = channel
-        self._panel      = panel
-        self._server_url = server_url
-        self._running    = True
+        self.channel      = channel
+        self._panel       = panel
+        self._server_url  = server_url
+        self._source_lang = source_lang
+        self._target_lang = target_lang
+        self._running     = True
 
         accent = SESSION_COLORS[index % len(SESSION_COLORS)]
         self.win = OverlayWindow(channel, font_size, accent)
@@ -258,7 +322,12 @@ class WebSocketSession(QObject):
         url = f"{self._server_url}/ws"
         try:
             async with websockets.connect(url) as ws:
-                await ws.send(json.dumps({"action": "start", "channel": self.channel}))
+                await ws.send(json.dumps({
+                    "action": "start",
+                    "channel": self.channel,
+                    "source_lang": self._source_lang,
+                    "target_lang": self._target_lang,
+                }))
                 while self._running:
                     try:
                         raw = await asyncio.wait_for(ws.recv(), timeout=1.0)
@@ -270,7 +339,7 @@ class WebSocketSession(QObject):
                         continue
                     except Exception as ex:
                         self.text_signal.emit(
-                            f"[{self.channel}]  Erreur : {ex}")
+                            f"[{self.channel}]  {tr('err_generic')} : {ex}")
                         break
                 try:
                     await ws.send(json.dumps({"action": "stop", "channel": self.channel}))
@@ -278,7 +347,7 @@ class WebSocketSession(QObject):
                     pass
         except Exception as ex:
             self.text_signal.emit(
-                f"[{self.channel}]  Connexion impossible ({self._server_url}) : {ex}")
+                f"[{self.channel}]  {tr('err_connect')} ({self._server_url}) : {ex}")
 
     def set_font_size(self, size: int):
         self.win.set_font_size(size)
@@ -387,7 +456,7 @@ class ControlPanel(QWidget):
         bl.addSpacing(50)
         root.addWidget(bar)
 
-        self._status_lbl = QLabel("● Déconnecté")
+        self._status_lbl = QLabel(tr("status_idle"))
         self._status_lbl.setFont(QFont(FONT, 9))
         self._status_lbl.setStyleSheet(f"color: {LILAC}; padding-left: 16px;")
         root.addWidget(self._status_lbl)
@@ -412,13 +481,62 @@ class ControlPanel(QWidget):
         cl.addWidget(self._sep())
         cl.addSpacing(10)
 
+        # Langue source + langue cible
+        _combo_ss = f"""
+            QComboBox {{
+                background: #18181b; color: #efeff1;
+                border: 1px solid #4a2a6a; border-radius: 10px;
+                padding: 6px 12px; font-size: 10pt;
+            }}
+            QComboBox:focus {{ border: 1px solid #9147ff; }}
+            QComboBox::drop-down {{ border: none; width: 24px; }}
+            QComboBox QAbstractItemView {{
+                background: #18181b; color: #efeff1;
+                selection-background-color: #9147ff;
+                border: 1px solid #4a2a6a;
+            }}
+        """
+        lang_row = QHBoxLayout()
+        lang_row.setSpacing(8)
+
+        src_col = QVBoxLayout()
+        src_col.setSpacing(4)
+        src_col.addWidget(self._section(tr("source_lang")))
+        self._src_lang_box = QComboBox()
+        self._src_lang_box.addItems(list(SOURCE_LANGUAGES.keys()))
+        self._src_lang_box.setFont(QFont(FONT, 10))
+        self._src_lang_box.setStyleSheet(_combo_ss)
+        src_col.addWidget(self._src_lang_box)
+        lang_row.addLayout(src_col)
+
+        arrow = QLabel("→")
+        arrow.setFont(QFont(FONT, 14))
+        arrow.setStyleSheet(f"color: {FG_DIM};")
+        arrow.setAlignment(Qt.AlignCenter)
+        lang_row.addWidget(arrow)
+
+        tgt_col = QVBoxLayout()
+        tgt_col.setSpacing(4)
+        tgt_col.addWidget(self._section(tr("trans_lang")))
+        self._tgt_lang_box = QComboBox()
+        self._tgt_lang_box.addItems(list(TARGET_LANGUAGES.keys()))
+        self._tgt_lang_box.setFont(QFont(FONT, 10))
+        self._tgt_lang_box.setStyleSheet(_combo_ss)
+        tgt_col.addWidget(self._tgt_lang_box)
+        lang_row.addLayout(tgt_col)
+
+        cl.addLayout(lang_row)
+        cl.addSpacing(14)
+        cl.addWidget(self._sep())
+        cl.addSpacing(10)
+
         # Ajouter une chaîne
-        cl.addWidget(self._section("Ajouter une chaîne"))
+        cl.addWidget(self._section(tr("add_channel")))
         cl.addSpacing(5)
         irow = QHBoxLayout()
         irow.setSpacing(8)
         self._input = QLineEdit()
-        self._input.setPlaceholderText("ex: b_a_s_y_a")
+        self._input.setPlaceholderText(tr("placeholder"))
         self._input.setFont(QFont(FONT, 10))
         self._input.returnPressed.connect(self._start)
         irow.addWidget(self._input)
@@ -433,11 +551,11 @@ class ControlPanel(QWidget):
         cl.addSpacing(10)
 
         # Sessions actives
-        cl.addWidget(self._section("Sessions actives"))
+        cl.addWidget(self._section(tr("active")))
         cl.addSpacing(5)
         self._sessions_lay = QVBoxLayout()
         self._sessions_lay.setSpacing(5)
-        self._no_session = QLabel("Aucune session")
+        self._no_session = QLabel(tr("none"))
         self._no_session.setFont(QFont(FONT, 9))
         self._no_session.setStyleSheet(f"color: {FG_DIM}; font-style: italic;")
         self._sessions_lay.addWidget(self._no_session)
@@ -448,7 +566,7 @@ class ControlPanel(QWidget):
 
         # Taille du texte
         sh = QHBoxLayout()
-        sh.addWidget(self._section("Taille du texte"))
+        sh.addWidget(self._section(tr("text_size")))
         sh.addStretch()
         self._size_lbl = QLabel("16 px")
         self._size_lbl.setFont(QFont(FONT, 9, QFont.Bold))
@@ -467,7 +585,7 @@ class ControlPanel(QWidget):
 
         # Tout arrêter
         stop_all = GradientButton(
-            "■  Tout arrêter", "#2a1040", "#3a1a5a",
+            tr("stop_all"), "#2a1040", "#3a1a5a",
             text_color=LILAC, border_color="#6a3a9a")
         stop_all.setFont(QFont(FONT, 10, QFont.DemiBold))
         stop_all.setFixedHeight(40)
@@ -503,14 +621,19 @@ class ControlPanel(QWidget):
             return
         if not _TWITCH_RE.match(ch):
             return
+        src_label  = self._src_lang_box.currentText()
+        src_whisper, src_deepl = SOURCE_LANGUAGES[src_label]
+        tgt_label  = self._tgt_lang_box.currentText()
+        tgt_code   = TARGET_LANGUAGES[tgt_label]
         idx = len(self._sessions)
-        s = WebSocketSession(ch, idx, self._slider.value(), self, self._server_url())
+        s = WebSocketSession(ch, idx, self._slider.value(), self,
+                             self._server_url(), src_deepl, tgt_code)
         self._sessions[ch] = s
-        self._add_row(ch, idx)
+        self._add_row(ch, idx, src_deepl, tgt_code)
         self._input.clear()
         self._update_status()
 
-    def _add_row(self, channel: str, idx: int):
+    def _add_row(self, channel: str, idx: int, src_code: str = "RU", tgt_code: str = "FR"):
         self._no_session.hide()
         color = SESSION_COLORS[idx % len(SESSION_COLORS)]
         row = QWidget()
@@ -531,7 +654,7 @@ class ControlPanel(QWidget):
         name.setFont(QFont(FONT, 11, QFont.DemiBold))
         rl.addWidget(name)
         rl.addStretch()
-        tag = QLabel("RU → FR")
+        tag = QLabel(f"{src_code} → {tgt_code[:2]}")
         tag.setFont(QFont(FONT, 9))
         tag.setStyleSheet(f"color: {FG_DIM}; background: transparent; border: none;")
         rl.addWidget(tag)
@@ -581,10 +704,10 @@ class ControlPanel(QWidget):
     def _update_status(self):
         n = len(self._sessions)
         if n == 0:
-            self._status_lbl.setText("● Connecté · aucune session")
+            self._status_lbl.setText(tr("status_idle"))
         else:
             s = "s" if n > 1 else ""
-            self._status_lbl.setText(f"● Connecté · {n} session{s} active{s}")
+            self._status_lbl.setText(tr("status_n", n=n, s=s))
 
     def _on_size(self, val: int):
         self._size_lbl.setText(f"{val} px")

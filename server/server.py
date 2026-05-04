@@ -111,8 +111,14 @@ app = FastAPI(title="Subly Server", lifespan=lifespan)
 #  ChannelSession
 # ══════════════════════════════════════════════════════════════════════════════
 class ChannelSession:
-    def __init__(self, channel: str):
-        self.channel  = channel
+    # Correspondance DeepL source → code Whisper
+    _DEEPL_TO_WHISPER = {"RU": "ru", "UK": "uk"}
+
+    def __init__(self, channel: str, source_lang: str = "RU", target_lang: str = "FR"):
+        self.channel     = channel
+        self.source_lang = source_lang
+        self.target_lang = target_lang
+        self._whisper_lang = self._DEEPL_TO_WHISPER.get(source_lang, "ru")
         self.clients: Set[WebSocket] = set()
         self._audio_q = queue.Queue()
         self._running = True
@@ -183,8 +189,12 @@ class ChannelSession:
                 continue
 
             audio = np.frombuffer(data, dtype=np.int16).astype(np.float32) / 32768.0
-            segs, _ = _whisper.transcribe(audio, language="ru")
-            ru = " ".join(s.text for s in segs).strip()
+            segs, _ = _whisper.transcribe(
+                audio, language=self._whisper_lang,
+                vad_filter=True,           # ignore les passages sans voix
+                vad_parameters={"threshold": 0.5},  # sensibilité (0=tout garder, 1=très strict)
+            )
+            ru = " ".join(s.text for s in segs if s.no_speech_prob < 0.6).strip()
             if not ru:
                 continue
 
@@ -196,7 +206,7 @@ class ChannelSession:
                 ru_ctx = " ".join(self._ctx)
 
                 result = _deepl.translate_text(
-                    ru_ctx, source_lang="RU", target_lang="FR")
+                    ru_ctx, source_lang=self.source_lang, target_lang=self.target_lang)
                 self._broadcast_sync(result.text)
             except Exception as ex:
                 self._broadcast_sync(f"Erreur traduction : {ex}")
@@ -226,35 +236,39 @@ async def ws_endpoint(ws: WebSocket):
     active: Set[str] = set()
     try:
         while True:
-            msg     = await ws.receive_json()
-            action  = msg.get("action", "")
-            channel = msg.get("channel", "").strip().lower()
+            msg         = await ws.receive_json()
+            action      = msg.get("action", "")
+            channel     = msg.get("channel", "").strip().lower()
+            source_lang = msg.get("source_lang", "RU").upper()
+            target_lang = msg.get("target_lang", "FR").upper()
             if not channel:
                 continue
 
+            key = f"{channel}_{source_lang}_{target_lang}"
+
             if action == "start":
-                if channel not in _sessions:
-                    _sessions[channel] = ChannelSession(channel)
-                _sessions[channel].add_client(ws)
-                active.add(channel)
+                if key not in _sessions:
+                    _sessions[key] = ChannelSession(channel, source_lang, target_lang)
+                _sessions[key].add_client(ws)
+                active.add(key)
 
             elif action == "stop":
-                if channel in _sessions:
-                    _sessions[channel].remove_client(ws)
-                    if not _sessions[channel].clients:
-                        _sessions[channel].stop()
-                        del _sessions[channel]
-                active.discard(channel)
+                if key in _sessions:
+                    _sessions[key].remove_client(ws)
+                    if not _sessions[key].clients:
+                        _sessions[key].stop()
+                        del _sessions[key]
+                active.discard(key)
 
     except WebSocketDisconnect:
         pass
     finally:
-        for ch in list(active):
-            if ch in _sessions:
-                _sessions[ch].remove_client(ws)
-                if not _sessions[ch].clients:
-                    _sessions[ch].stop()
-                    del _sessions[ch]
+        for key in list(active):
+            if key in _sessions:
+                _sessions[key].remove_client(ws)
+                if not _sessions[key].clients:
+                    _sessions[key].stop()
+                    del _sessions[key]
 
 
 # ══════════════════════════════════════════════════════════════════════════════
