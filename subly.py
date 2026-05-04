@@ -14,22 +14,28 @@ import os
 # ── Evite les conflits Intel OpenMP (ctranslate2) vs autres runtimes ──────────
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
-# ── DLL CUDA — doit etre fait AVANT tout import ctranslate2 / PyTorch ─────────
-# Python 3.8+ Windows n'utilise plus os.environ["PATH"] pour charger les DLLs
-# des extensions C. os.add_dll_directory() est obligatoire.
-_VENV_SITE = os.path.join(sys.prefix, "Lib", "site-packages")
-for _dll_dir in (
-    os.path.join(_VENV_SITE, "ctranslate2"),
-    os.path.join(_VENV_SITE, "nvidia", "cublas", "bin"),
-    os.path.join(_VENV_SITE, "nvidia", "cudnn", "bin"),
-    os.path.join(_VENV_SITE, "nvidia", "cuda_runtime", "bin"),
-):
-    if os.path.isdir(_dll_dir):
-        os.add_dll_directory(_dll_dir)
-        os.environ["PATH"] = _dll_dir + ";" + os.environ.get("PATH", "")
+# ── Chemin de base (compatible frozen PyInstaller et execution normale) ────────
+if getattr(sys, "frozen", False):
+    # PyInstaller 6.x onedir : les DLLs et ressources sont dans _internal/ (= sys._MEIPASS)
+    _BASE_DIR = sys._MEIPASS
+    os.add_dll_directory(_BASE_DIR)
+else:
+    # Execution normale depuis le venv
+    _BASE_DIR  = os.path.dirname(os.path.abspath(__file__))
+    # Python 3.8+ Windows n'utilise plus os.environ["PATH"] pour charger les DLLs
+    # des extensions C. os.add_dll_directory() est obligatoire.
+    _VENV_SITE = os.path.join(sys.prefix, "Lib", "site-packages")
+    for _dll_dir in (
+        os.path.join(_VENV_SITE, "ctranslate2"),
+        os.path.join(_VENV_SITE, "nvidia", "cublas", "bin"),
+        os.path.join(_VENV_SITE, "nvidia", "cudnn", "bin"),
+        os.path.join(_VENV_SITE, "nvidia", "cuda_runtime", "bin"),
+    ):
+        if os.path.isdir(_dll_dir):
+            os.add_dll_directory(_dll_dir)
+            os.environ["PATH"] = _dll_dir + ";" + os.environ.get("PATH", "")
 
 # ── Constantes ─────────────────────────────────────────────────────────────────
-_BASE_DIR  = os.path.dirname(os.path.abspath(__file__))
 _NLLB_NAME = "facebook/nllb-200-distilled-1.3B"
 
 
