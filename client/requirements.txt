@@ -1,0 +1,3 @@
+# Client Subly — aucun GPU requis
+PyQt5
+websockets

@@ -1,0 +1,16 @@
+# Serveur Subly
+fastapi
+uvicorn[standard]
+websockets
+faster-whisper
+streamlink
+transformers
+sentencepiece
+numpy
+
+# CUDA — versions épinglées, compatibles CTranslate2 4.x
+nvidia-cublas-cu12==12.3.4.1
+nvidia-cudnn-cu12==9.1.0.70
+
+# PyTorch CUDA 11.8 — installer via :
+# pip install torch --index-url https://download.pytorch.org/whl/cu118

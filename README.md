@@ -1,113 +1,117 @@
 # 🦄 Subly
 
-Real-time **Russian → French** subtitle overlay for Twitch streams.  
-Subly listens to any Twitch channel, transcribes the speech with Whisper, translates it with NLLB-200, and displays a floating subtitle window directly on your screen.
+Real-time **Russian → French** subtitle overlay for Twitch streams.
+
+Subly is split into two parts:
+- **Server** — runs the AI models (Whisper + NLLB-200), captures Twitch streams and sends translated subtitles
+- **Client** — lightweight overlay UI, connects to the server via WebSocket, no GPU required
 
 ---
 
-## Features
+## Architecture
 
-- **Live subtitles** — 5-second chunks, continuously updated
-- **Multi-channel** — monitor several streams simultaneously, each with its own overlay
-- **Offline AI** — everything runs locally, no API key needed
-- **Custom overlay** — resizable, draggable, adjustable font size, toggleable opacity
-- **Clean UI** — frameless dark interface with a Twitch-inspired palette
+```
+┌─────────────────────────────────┐        ┌─────────────────────────────┐
+│  Server  (GPU machine)          │        │  Client  (any machine)      │
+│                                 │        │                             │
+│  Whisper large-v3  (STT)        │◄──WS──►│  PyQt5 overlay UI           │
+│  NLLB-200 1.3B     (translate)  │        │  Enter channel → subtitles  │
+│  streamlink + ffmpeg            │        │                             │
+└─────────────────────────────────┘        └─────────────────────────────┘
+```
+
+Both can run on the **same machine** (use `ws://localhost:8765`) or on separate machines over a local network.
 
 ---
 
 ## Requirements
 
+### Server
 | Component | Minimum |
 |-----------|---------|
 | OS | Windows 10/11 64-bit |
-| GPU | NVIDIA GPU with CUDA support (8 GB VRAM recommended) |
+| GPU | NVIDIA with CUDA support |
 | VRAM | ~7 GB (Whisper large-v3 + NLLB-200 1.3B) |
-| RAM | 8 GB |
 | Python | 3.10+ |
-| CUDA Driver | 520+ (check with `nvidia-smi`) |
 
-> ⚠️ **CPU-only is not supported.** Both models are loaded on CUDA.
+### Client
+| Component | Minimum |
+|-----------|---------|
+| OS | Windows / macOS / Linux |
+| Python | 3.10+ |
+| GPU | Not required |
 
 ---
 
-## Models used
+## Models
 
 | Role | Model |
 |------|-------|
 | Speech-to-text | [Systran/faster-whisper-large-v3](https://huggingface.co/Systran/faster-whisper-large-v3) |
 | Translation | [facebook/nllb-200-distilled-1.3B](https://huggingface.co/facebook/nllb-200-distilled-1.3B) |
 
-Models are downloaded automatically from Hugging Face on first launch (~4 GB total).
+Downloaded automatically on first server launch (~4 GB).
 
 ---
 
 ## Installation
 
+### Server (GPU machine)
+
 ```bat
-git clone https://github.com/Sapinus987/WIPsubly.git
-cd WIPsubly
+cd server
 install.bat
 ```
 
-`install.bat` will:
-1. Create a Python virtual environment (`env/`)
-2. Install all Python dependencies
-3. Install PyTorch with CUDA 11.8
-4. Install pinned CUDA libraries (cublas, cudnn) compatible with CTranslate2 4.x
-5. Download `ffmpeg.exe` into `ffmpeg/bin/`
+### Client (any machine)
+
+```bat
+cd client
+install.bat
+```
 
 ---
 
 ## Usage
 
+### 1 — Start the server
+
 ```bat
-lancer.bat
+cd server
+launch.bat
 ```
 
-1. Subly loads Whisper and NLLB-200 (first launch takes a few minutes for downloads)
-2. A splash screen appears during initialization
-3. The **Control Panel** opens — type a Twitch channel name and press **+**
-4. A subtitle overlay appears on screen for that channel
-5. Use the **font size slider** to adjust text size across all overlays
+Wait for: `[Subly] Modèles prêts.` before connecting clients.
 
-### Overlay controls
+### 2 — Start the client
 
-| Action | How |
-|--------|-----|
-| Move | Drag anywhere on the overlay |
-| Resize | Bottom-right grip |
-| Toggle opacity | Orange button (top-left) |
-| Close | Red button (top-left) |
+```bat
+cd client
+launch.bat
+```
+
+### 3 — Add a channel
+
+- If client and server are on the **same machine**: leave the server field as `ws://localhost:8765`
+- If on **separate machines**: replace `localhost` with the server's local IP (e.g. `ws://192.168.1.10:8765`)
+- Enter a Twitch channel name and press **+**
 
 ---
 
 ## Project structure
 
 ```
-WIPsubly/
-├── subly.py       # Entry point — critical init order (CUDA before Qt)
-├── ui.py          # All PyQt5 classes (ControlPanel, OverlayWindow, …)
-├── install.bat    # One-click installer
-├── lancer.bat     # Launcher
-├── requirements.txt
+Subly/
+├── server/
+│   ├── server.py       # FastAPI + WebSocket + Whisper + NLLB
+│   ├── install.bat     # Server dependencies
+│   └── launch.bat      # Start server
+├── client/
+│   ├── client.py       # PyQt5 overlay UI
+│   ├── install.bat     # Client dependencies (PyQt5 + websockets only)
+│   └── launch.bat      # Start client
 └── .gitignore
 ```
-
-> `ffmpeg/` and `env/` are created locally by `install.bat` and are not versioned.
-
----
-
-## Technical notes
-
-**Initialization order matters.**  
-PyQt5 initializes Direct3D/OpenGL GPU resources that conflict with CTranslate2's CUDA context if imported first. `subly.py` enforces the correct order:
-
-1. CTranslate2 / Whisper (CUDA)
-2. PyQt5
-3. Transformers / PyTorch
-
-**Sliding context window.**  
-The last 2 transcribed Russian segments are concatenated before translation, giving NLLB-200 enough context to produce coherent output across chunk boundaries.
 
 ---
 

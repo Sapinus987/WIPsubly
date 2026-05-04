@@ -8,6 +8,13 @@ __pycache__/
 build/
 dist/
 
+# Environnements virtuels (server et client)
+server/env/
+client/env/
+
+# ffmpeg (telecharge par install.bat)
+server/ffmpeg/
+
 # Binaires lourds (non versionnés)
 ffmpeg/
 
