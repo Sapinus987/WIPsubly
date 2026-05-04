@@ -47,7 +47,7 @@ _SL_EXE  = os.path.join(_SCRIPTS, "streamlink.exe")
 STREAMLINK = _SL_EXE if os.path.exists(_SL_EXE) else "streamlink"
 
 SAMPLE_RATE    = 16_000
-CHUNK_SEC      = 5
+CHUNK_SEC      = 3
 HOST           = "0.0.0.0"
 PORT           = 8765
 
@@ -83,12 +83,10 @@ def _load_models():
     global _whisper, _deepl
     import deepl
     from faster_whisper import WhisperModel
-    from huggingface_hub import snapshot_download
 
-    print("[Subly] Verification Whisper large-v3...")
-    model_path = snapshot_download("Systran/faster-whisper-large-v3")
+    print("[Subly] Telechargement Whisper large-v3-turbo...")
     print("[Subly] Init Whisper CUDA...")
-    _whisper = WhisperModel(model_path, device="cuda", compute_type="float16")
+    _whisper = WhisperModel("large-v3-turbo", device="cuda", compute_type="float16")
 
     print("[Subly] Init DeepL...")
     _deepl = deepl.Translator(DEEPL_KEY)
@@ -125,7 +123,6 @@ class ChannelSession:
         self.clients: Set[WebSocket] = set()
         self._audio_q = queue.Queue()
         self._running = True
-        self._ctx     = []   # contexte glissant : 2 derniers segments RU
         self._sl_proc = None
         self._ff_proc = None
 
@@ -194,22 +191,17 @@ class ChannelSession:
             audio = np.frombuffer(data, dtype=np.int16).astype(np.float32) / 32768.0
             segs, _ = _whisper.transcribe(
                 audio, language=self._whisper_lang,
-                vad_filter=True,           # ignore les passages sans voix
-                vad_parameters={"threshold": 0.5},  # sensibilité (0=tout garder, 1=très strict)
+                beam_size=1,
+                vad_filter=True,
+                vad_parameters={"threshold": 0.5},
             )
-            ru = " ".join(s.text for s in segs if s.no_speech_prob < 0.6).strip()
-            if not ru:
+            src_text = " ".join(s.text for s in segs if s.no_speech_prob < 0.6).strip()
+            if not src_text:
                 continue
 
             try:
-                # Contexte glissant pour DeepL (meilleure cohérence narrative)
-                self._ctx.append(ru)
-                if len(self._ctx) > 2:
-                    self._ctx.pop(0)
-                ru_ctx = " ".join(self._ctx)
-
                 result = _deepl.translate_text(
-                    ru_ctx, source_lang=self.source_lang, target_lang=self.target_lang)
+                    src_text, source_lang=self.source_lang, target_lang=self.target_lang)
                 self._broadcast_sync(result.text)
             except Exception as ex:
                 self._broadcast_sync(f"Erreur traduction : {ex}")

@@ -181,7 +181,7 @@ class OverlayWindow(QWidget):
             Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setMinimumSize(340, 70)
-        self.resize(860, 95)
+        self.resize(860, 130)
         self._build(font_size)
 
     def _build(self, font_size: int):
@@ -329,9 +329,27 @@ class WebSocketSession(QObject):
         """Lance la boucle asyncio dans ce thread."""
         asyncio.run(self._connect())
 
+    # Nombre de segments conservés dans le buffer d'affichage
+    MAX_SEGMENTS = 3
+    # Secondes de silence avant effacement du buffer
+    CLEAR_AFTER  = 8.0
+
     async def _connect(self):
         import websockets
+        import time
         url = f"{self._server_url}/ws"
+
+        _segments     = []     # buffer des derniers segments traduits
+        _last_recv    = [0.0]  # timestamp du dernier chunk reçu
+
+        async def _clear_loop():
+            """Efface le buffer après une période de silence."""
+            while self._running:
+                await asyncio.sleep(1.0)
+                if _segments and time.monotonic() - _last_recv[0] > self.CLEAR_AFTER:
+                    _segments.clear()
+                    self.text_signal.emit(f"[{self.channel}]")
+
         try:
             async with websockets.connect(url) as ws:
                 await ws.send(json.dumps({
@@ -340,23 +358,31 @@ class WebSocketSession(QObject):
                     "source_lang": self._source_lang,
                     "target_lang": self._target_lang,
                 }))
-                while self._running:
-                    try:
-                        raw = await asyncio.wait_for(ws.recv(), timeout=1.0)
-                        data = json.loads(raw)
-                        if data.get("channel") == self.channel:
-                            self.text_signal.emit(
-                                f"[{self.channel}]  {data['text']}")
-                    except asyncio.TimeoutError:
-                        continue
-                    except Exception as ex:
-                        self.text_signal.emit(
-                            f"[{self.channel}]  {tr('err_generic')} : {ex}")
-                        break
+                clear_task = asyncio.ensure_future(_clear_loop())
                 try:
-                    await ws.send(json.dumps({"action": "stop", "channel": self.channel}))
-                except Exception:
-                    pass
+                    while self._running:
+                        try:
+                            raw  = await asyncio.wait_for(ws.recv(), timeout=1.0)
+                            data = json.loads(raw)
+                            if data.get("channel") == self.channel:
+                                _segments.append(data["text"])
+                                if len(_segments) > self.MAX_SEGMENTS:
+                                    _segments.pop(0)
+                                _last_recv[0] = time.monotonic()
+                                self.text_signal.emit(
+                                    f"[{self.channel}]  " + "  ".join(_segments))
+                        except asyncio.TimeoutError:
+                            continue
+                        except Exception as ex:
+                            self.text_signal.emit(
+                                f"[{self.channel}]  {tr('err_generic')} : {ex}")
+                            break
+                finally:
+                    clear_task.cancel()
+                    try:
+                        await ws.send(json.dumps({"action": "stop", "channel": self.channel}))
+                    except Exception:
+                        pass
         except Exception as ex:
             self.text_signal.emit(
                 f"[{self.channel}]  {tr('err_connect')} ({self._server_url}) : {ex}")
