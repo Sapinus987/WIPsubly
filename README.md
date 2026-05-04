@@ -48,7 +48,7 @@ Both can run on the **same machine** (use `ws://localhost:8765`) or on separate 
 
 Subly uses [DeepL](https://www.deepl.com) for Russian → French translation.
 
-**The free plan includes 500,000 characters/month** — more than enough for personal streaming use.
+**The free plan includes 1,000,000 characters/year** — more than enough for personal streaming use.
 
 ### How to get your free API key
 
