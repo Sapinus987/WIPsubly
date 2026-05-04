@@ -1,0 +1,25 @@
+# Python
+env/
+__pycache__/
+*.pyc
+*.pyo
+
+# Build
+build/
+dist/
+*.spec
+
+# Binaires lourds (non versionnés)
+ffmpeg/
+
+# Logs et artefacts temporaires
+*.log
+*.zip
+*.tmp
+
+# Fonts (a installer via install.bat)
+fonts/
+
+# OS
+.DS_Store
+Thumbs.db

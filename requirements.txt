@@ -1,0 +1,15 @@
+# Runtime
+faster-whisper
+streamlink
+transformers
+sentencepiece
+PyQt5
+numpy
+
+# CUDA — versions épinglées, compatibles CTranslate2 4.x
+# (ne pas upgrader sans vérifier la compatibilité)
+nvidia-cublas-cu12==12.3.4.1
+nvidia-cudnn-cu12==9.1.0.70
+
+# PyTorch CUDA 11.8 — installer via :
+# pip install torch --index-url https://download.pytorch.org/whl/cu118
