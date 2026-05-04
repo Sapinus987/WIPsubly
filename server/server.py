@@ -1,13 +1,11 @@
 """
 Subly Server — Backend FastAPI + WebSocket
 
-Rôle : charger Whisper large-v3 + NLLB-200 1.3B, capturer les streams Twitch,
-transcrire (russe) et traduire (français), puis diffuser le texte à tous les
-clients connectés via WebSocket.
+Pipeline :
+  Twitch (streamlink) → ffmpeg (audio PCM) → Whisper large-v3 (STT russe)
+  → DeepL API (traduction FR) → WebSocket → clients légers
 
-Ordre d'initialisation critique :
-  CTranslate2 / Whisper (CUDA) doit être importé AVANT PyQt5.
-  Ici, pas de PyQt5 : aucun risque de conflit.
+La clé DeepL est lue depuis le fichier server/deepl.key (une ligne, jamais versionné).
 """
 import os
 import sys
@@ -21,7 +19,7 @@ from typing import Dict, Set
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 import uvicorn
 
-# ── DLL CUDA ───────────────────────────────────────────────────────────────────
+# ── DLL CUDA (Whisper / CTranslate2) ──────────────────────────────────────────
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 _VENV_SITE = os.path.join(sys.prefix, "Lib", "site-packages")
 for _dll_dir in (
@@ -35,25 +33,43 @@ for _dll_dir in (
         os.environ["PATH"] = _dll_dir + ";" + os.environ.get("PATH", "")
 
 # ── Constantes ─────────────────────────────────────────────────────────────────
-_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-# Cherche ffmpeg dans server/ffmpeg/ (install propre) puis à la racine du projet (fallback)
+_BASE_DIR      = os.path.dirname(os.path.abspath(__file__))
 _FFMPEG_LOCAL  = os.path.join(_BASE_DIR, "ffmpeg", "bin", "ffmpeg.exe")
 _FFMPEG_PARENT = os.path.join(os.path.dirname(_BASE_DIR), "ffmpeg", "bin", "ffmpeg.exe")
-FFMPEG_PATH = _FFMPEG_LOCAL if os.path.exists(_FFMPEG_LOCAL) else _FFMPEG_PARENT
-_NLLB_NAME  = "facebook/nllb-200-distilled-1.3B"
-SAMPLE_RATE = 16_000
-CHUNK_SEC   = 5
-HOST        = "0.0.0.0"
-PORT        = 8765
+FFMPEG_PATH    = _FFMPEG_LOCAL if os.path.exists(_FFMPEG_LOCAL) else _FFMPEG_PARENT
 
-# ── Modèles (initialisés au démarrage via lifespan) ───────────────────────────
-_whisper     = None
-_nllb_tok    = None
-_nllb_model  = None
-_fr_tok_id   = None
+# Streamlink : chemin complet dans le venv pour éviter les problèmes de PATH
+_SCRIPTS = os.path.join(sys.prefix, "Scripts")
+_SL_EXE  = os.path.join(_SCRIPTS, "streamlink.exe")
+STREAMLINK = _SL_EXE if os.path.exists(_SL_EXE) else "streamlink"
+
+SAMPLE_RATE    = 16_000
+CHUNK_SEC      = 5
+HOST           = "0.0.0.0"
+PORT           = 8765
+
+# ── Clé DeepL ─────────────────────────────────────────────────────────────────
+def _load_deepl_key() -> str:
+    # Priorité : variable d'environnement → fichier deepl.key
+    key = os.environ.get("DEEPL_API_KEY", "").strip()
+    if key:
+        return key
+    key_file = os.path.join(_BASE_DIR, "deepl.key")
+    if os.path.exists(key_file):
+        with open(key_file, encoding="utf-8") as f:
+            key = f.read().strip()
+    if not key:
+        print("[Subly] ERREUR : clé DeepL introuvable.")
+        print("        Crée le fichier server/deepl.key avec ta clé sur une seule ligne.")
+        sys.exit(1)
+    return key
+
+DEEPL_KEY = _load_deepl_key()
+
+# ── Globals ────────────────────────────────────────────────────────────────────
+_whisper  = None
+_deepl    = None
 _loop: asyncio.AbstractEventLoop = None
-
-# ── Sessions actives (channel → ChannelSession) ───────────────────────────────
 _sessions: Dict[str, "ChannelSession"] = {}
 
 
@@ -61,22 +77,21 @@ _sessions: Dict[str, "ChannelSession"] = {}
 #  Chargement des modèles
 # ══════════════════════════════════════════════════════════════════════════════
 def _load_models():
-    global _whisper, _nllb_tok, _nllb_model, _fr_tok_id
+    global _whisper, _deepl
+    import deepl
     from faster_whisper import WhisperModel
     from huggingface_hub import snapshot_download
-    from transformers import NllbTokenizer, AutoModelForSeq2SeqLM
 
-    print("[Subly] Téléchargement / vérification Whisper large-v3...")
+    print("[Subly] Verification Whisper large-v3...")
     model_path = snapshot_download("Systran/faster-whisper-large-v3")
     print("[Subly] Init Whisper CUDA...")
     _whisper = WhisperModel(model_path, device="cuda", compute_type="float16")
 
-    print("[Subly] Chargement NLLB-200 1.3B...")
-    _nllb_tok   = NllbTokenizer.from_pretrained(_NLLB_NAME, src_lang="rus_Cyrl")
-    _nllb_model = AutoModelForSeq2SeqLM.from_pretrained(
-        _NLLB_NAME, torch_dtype="auto").to("cuda")
-    _fr_tok_id  = _nllb_tok.convert_tokens_to_ids("fra_Latn")
-    print("[Subly] Modèles prêts.")
+    print("[Subly] Init DeepL...")
+    _deepl = deepl.Translator(DEEPL_KEY)
+    usage  = _deepl.get_usage()
+    print(f"[Subly] DeepL pret — {usage.character.count:,} / {usage.character.limit:,} caracteres utilises.")
+    print("[Subly] Serveur pret.")
 
 
 @asynccontextmanager
@@ -93,29 +108,29 @@ app = FastAPI(title="Subly Server", lifespan=lifespan)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  ChannelSession — capture + transcription + traduction pour une chaîne
+#  ChannelSession
 # ══════════════════════════════════════════════════════════════════════════════
 class ChannelSession:
     def __init__(self, channel: str):
-        self.channel   = channel
+        self.channel  = channel
         self.clients: Set[WebSocket] = set()
-        self._audio_q  = queue.Queue()
-        self._running  = True
-        self._ctx      = []          # contexte glissant (2 derniers segments RU)
-        self._sl_proc  = None
-        self._ff_proc  = None
+        self._audio_q = queue.Queue()
+        self._running = True
+        self._ctx     = []   # contexte glissant : 2 derniers segments RU
+        self._sl_proc = None
+        self._ff_proc = None
 
         threading.Thread(target=self._capture, daemon=True).start()
         threading.Thread(target=self._process, daemon=True).start()
 
-    # ── Gestion des clients ────────────────────────────────────────────────
+    # ── Clients ───────────────────────────────────────────────────────────
     def add_client(self, ws: WebSocket):
         self.clients.add(ws)
 
     def remove_client(self, ws: WebSocket):
         self.clients.discard(ws)
 
-    # ── Diffusion (appelée depuis un thread sync) ──────────────────────────
+    # ── Broadcast thread-safe ─────────────────────────────────────────────
     def _broadcast_sync(self, text: str):
         if _loop and self.clients:
             asyncio.run_coroutine_threadsafe(self._broadcast(text), _loop)
@@ -129,10 +144,10 @@ class ChannelSession:
                 dead.add(ws)
         self.clients -= dead
 
-    # ── Capture Twitch ─────────────────────────────────────────────────────
+    # ── Capture Twitch ────────────────────────────────────────────────────
     def _capture(self):
         url = f"https://www.twitch.tv/{self.channel}"
-        sl  = ["streamlink", "--stdout", url, "best"]
+        sl  = [STREAMLINK, "--stdout", url, "best"]
         ff  = [FFMPEG_PATH, "-i", "pipe:0",
                "-f", "s16le", "-ar", str(SAMPLE_RATE), "-ac", "1", "pipe:1"]
         try:
@@ -159,7 +174,7 @@ class ChannelSession:
                     except Exception:
                         pass
 
-    # ── Transcription + traduction ─────────────────────────────────────────
+    # ── Transcription (Whisper) + traduction (DeepL) ──────────────────────
     def _process(self):
         while self._running:
             try:
@@ -174,26 +189,19 @@ class ChannelSession:
                 continue
 
             try:
+                # Contexte glissant pour DeepL (meilleure cohérence narrative)
                 self._ctx.append(ru)
                 if len(self._ctx) > 2:
                     self._ctx.pop(0)
                 ru_ctx = " ".join(self._ctx)
 
-                inp = _nllb_tok(
-                    ru_ctx, return_tensors="pt",
-                    padding=True, truncation=True, max_length=512,
-                ).to("cuda")
-                out = _nllb_model.generate(
-                    **inp, forced_bos_token_id=_fr_tok_id,
-                    num_beams=2, max_new_tokens=128,
-                    repetition_penalty=1.2, no_repeat_ngram_size=3,
-                )
-                fr = _nllb_tok.decode(out[0], skip_special_tokens=True)
-                self._broadcast_sync(fr)
+                result = _deepl.translate_text(
+                    ru_ctx, source_lang="RU", target_lang="FR")
+                self._broadcast_sync(result.text)
             except Exception as ex:
                 self._broadcast_sync(f"Erreur traduction : {ex}")
 
-    # ── Arrêt ──────────────────────────────────────────────────────────────
+    # ── Arrêt ─────────────────────────────────────────────────────────────
     def stop(self):
         self._running = False
         for proc in (self._ff_proc, self._sl_proc):
@@ -209,23 +217,16 @@ class ChannelSession:
 # ══════════════════════════════════════════════════════════════════════════════
 @app.get("/ping")
 async def ping():
-    """Health-check pour le client."""
     return {"status": "ok", "sessions": list(_sessions.keys())}
 
 
 @app.websocket("/ws")
 async def ws_endpoint(ws: WebSocket):
-    """
-    Protocole :
-      Client → serveur : {"action": "start"|"stop", "channel": "nom"}
-      Serveur → client : {"channel": "nom", "text": "traduction"}
-    """
     await ws.accept()
     active: Set[str] = set()
-
     try:
         while True:
-            msg = await ws.receive_json()
+            msg     = await ws.receive_json()
             action  = msg.get("action", "")
             channel = msg.get("channel", "").strip().lower()
             if not channel:

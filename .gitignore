@@ -15,6 +15,10 @@ client/env/
 # ffmpeg (telecharge par install.bat)
 server/ffmpeg/
 
+# Cle API — ne jamais versionner
+server/deepl.key
+*.key
+
 # Binaires lourds (non versionnés)
 ffmpeg/
 
