@@ -2,8 +2,11 @@
 Subly Server — Backend FastAPI + WebSocket
 
 Pipeline :
-  Twitch (streamlink) → ffmpeg (audio PCM) → Whisper large-v3 (STT russe)
-  → DeepL API (traduction FR) → WebSocket → clients légers
+  Twitch (streamlink) → ffmpeg (audio PCM) → Whisper large-v3 (STT multilingue)
+  → DeepL API (traduction vers la langue cible) → WebSocket → clients légers
+
+Langues source supportées : RU, UK, EN, FR
+Langues cibles supportées : FR, EN-US, RU, UK
 
 La clé DeepL est lue depuis le fichier server/deepl.key (une ligne, jamais versionné).
 """
@@ -112,7 +115,7 @@ app = FastAPI(title="Subly Server", lifespan=lifespan)
 # ══════════════════════════════════════════════════════════════════════════════
 class ChannelSession:
     # Correspondance DeepL source → code Whisper
-    _DEEPL_TO_WHISPER = {"RU": "ru", "UK": "uk"}
+    _DEEPL_TO_WHISPER = {"RU": "ru", "UK": "uk", "EN": "en", "FR": "fr"}
 
     def __init__(self, channel: str, source_lang: str = "RU", target_lang: str = "FR"):
         self.channel     = channel

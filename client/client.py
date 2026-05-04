@@ -273,16 +273,28 @@ class OverlayWindow(QWidget):
 # ══════════════════════════════════════════════════════════════════════════════
 #  WebSocketSession — connexion WebSocket vers le serveur pour une chaîne
 # ══════════════════════════════════════════════════════════════════════════════
-# Langues source : (code Whisper, code DeepL)
+# Langues source : label → (code Whisper, code DeepL source)
 SOURCE_LANGUAGES = {
     "Русский":    ("ru", "RU"),
     "Українська": ("uk", "UK"),
+    "English":    ("en", "EN"),
+    "Français":   ("fr", "FR"),
 }
 
-# Langues cibles : code DeepL
+# Langues cibles : label → code DeepL cible
 TARGET_LANGUAGES = {
-    "Français": "FR",
-    "English":  "EN-US",
+    "Français":   "FR",
+    "English":    "EN-US",
+    "Русский":    "RU",
+    "Українська": "UK",
+}
+
+# Correspondance label source → label cible à exclure (même langue)
+_SRC_TO_TGT_EXCLUDE = {
+    "Русский":    "Русский",
+    "Українська": "Українська",
+    "English":    "English",
+    "Français":   "Français",
 }
 
 class WebSocketSession(QObject):
@@ -519,11 +531,14 @@ class ControlPanel(QWidget):
         tgt_col.setSpacing(4)
         tgt_col.addWidget(self._section(tr("trans_lang")))
         self._tgt_lang_box = QComboBox()
-        self._tgt_lang_box.addItems(list(TARGET_LANGUAGES.keys()))
         self._tgt_lang_box.setFont(QFont(FONT, 10))
         self._tgt_lang_box.setStyleSheet(_combo_ss)
         tgt_col.addWidget(self._tgt_lang_box)
         lang_row.addLayout(tgt_col)
+
+        # Filtrage dynamique : la langue source est retirée des cibles
+        self._src_lang_box.currentIndexChanged.connect(self._refresh_tgt_lang)
+        self._refresh_tgt_lang()
 
         cl.addLayout(lang_row)
         cl.addSpacing(14)
@@ -606,6 +621,21 @@ class ControlPanel(QWidget):
         l.setFont(QFont(FONT, 8, QFont.Bold))
         l.setStyleSheet(f"color: {FG_DIM}; letter-spacing: 0.08em;")
         return l
+
+    def _refresh_tgt_lang(self):
+        """Met à jour la liste des langues cibles en excluant la langue source."""
+        src_label = self._src_lang_box.currentText()
+        exclude   = _SRC_TO_TGT_EXCLUDE.get(src_label, "")
+        current   = self._tgt_lang_box.currentText()
+        self._tgt_lang_box.blockSignals(True)
+        self._tgt_lang_box.clear()
+        for label in TARGET_LANGUAGES:
+            if label != exclude:
+                self._tgt_lang_box.addItem(label)
+        # Conserver la sélection précédente si encore disponible
+        idx = self._tgt_lang_box.findText(current)
+        self._tgt_lang_box.setCurrentIndex(max(idx, 0))
+        self._tgt_lang_box.blockSignals(False)
 
     def _server_url(self) -> str:
         url = self._server_input.text().strip()
