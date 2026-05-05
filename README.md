@@ -63,6 +63,8 @@ cd WIPsubly
 
 > If you don't have Git installed, download it at **[git-scm.com](https://git-scm.com/downloads)**.
 
+> ⚠️ **Python tip:** On the Python download page, click the large **"Download Python"** button (the recommended installer). Avoid downloading individual packages — they can cause PATH issues that prevent the install scripts from working.
+
 ---
 
 ## Step 2 — Get a free DeepL API key
