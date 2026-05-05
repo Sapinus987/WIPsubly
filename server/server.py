@@ -200,9 +200,14 @@ class ChannelSession:
                 continue
 
             try:
-                result = _deepl.translate_text(
-                    src_text, source_lang=self.source_lang, target_lang=self.target_lang)
-                self._broadcast_sync(result.text)
+                # Même langue source et cible → transcription directe, pas de DeepL
+                tgt_base = self.target_lang.split("-")[0]   # "EN-US" → "EN"
+                if self.source_lang == tgt_base:
+                    self._broadcast_sync(src_text)
+                else:
+                    result = _deepl.translate_text(
+                        src_text, source_lang=self.source_lang, target_lang=self.target_lang)
+                    self._broadcast_sync(result.text)
             except Exception as ex:
                 self._broadcast_sync(f"Erreur traduction : {ex}")
 

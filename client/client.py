@@ -289,14 +289,6 @@ TARGET_LANGUAGES = {
     "Українська": "UK",
 }
 
-# Correspondance label source → label cible à exclure (même langue)
-_SRC_TO_TGT_EXCLUDE = {
-    "Русский":    "Русский",
-    "Українська": "Українська",
-    "English":    "English",
-    "Français":   "Français",
-}
-
 class WebSocketSession(QObject):
     text_signal = pyqtSignal(str)
 
@@ -649,15 +641,11 @@ class ControlPanel(QWidget):
         return l
 
     def _refresh_tgt_lang(self):
-        """Met à jour la liste des langues cibles en excluant la langue source."""
-        src_label = self._src_lang_box.currentText()
-        exclude   = _SRC_TO_TGT_EXCLUDE.get(src_label, "")
-        current   = self._tgt_lang_box.currentText()
+        """Met à jour la liste des langues cibles."""
+        current = self._tgt_lang_box.currentText()
         self._tgt_lang_box.blockSignals(True)
         self._tgt_lang_box.clear()
-        for label in TARGET_LANGUAGES:
-            if label != exclude:
-                self._tgt_lang_box.addItem(label)
+        self._tgt_lang_box.addItems(list(TARGET_LANGUAGES.keys()))
         # Conserver la sélection précédente si encore disponible
         idx = self._tgt_lang_box.findText(current)
         self._tgt_lang_box.setCurrentIndex(max(idx, 0))

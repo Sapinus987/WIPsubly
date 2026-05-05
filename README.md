@@ -6,7 +6,7 @@ Subly listens to a stream, transcribes the speech with Whisper and translates it
 **Supported input languages:** Russian 🇷🇺, Ukrainian 🇺🇦, English 🇬🇧, French 🇫🇷  
 **Supported output languages:** French 🇫🇷, English 🇬🇧, Russian 🇷🇺, Ukrainian 🇺🇦
 
-Any combination is supported — translate from any input language to any other output language.
+Any combination is supported — including same language input/output for live transcription (e.g. French → French for hearing-impaired viewers).
 
 ---
 
@@ -42,14 +42,14 @@ Twitch stream
 | GPU | NVIDIA (CUDA-compatible) |
 | VRAM | 2 GB |
 | RAM | 8 GB |
-| Python | 3.10 or higher |
+| Python | [3.10 or higher](https://www.python.org/downloads/) |
 | Internet | Required (Twitch + DeepL API) |
 
 ### Client machine
 | | Minimum |
 |-|---------|
 | OS | Windows, macOS or Linux |
-| Python | 3.10 or higher |
+| Python | [3.10 or higher](https://www.python.org/downloads/) |
 | GPU | Not required |
 
 ---
@@ -135,7 +135,7 @@ The control panel opens. The interface language is automatically set based on yo
 
 1. **Server field** — leave `ws://localhost:8765` if the server is on the same machine. If on another machine, replace `localhost` with its local IP address (e.g. `ws://192.168.1.10:8765`)
 2. **Stream language** — choose the language spoken on the stream (Russian, Ukrainian, English or French)
-3. **Translation language** — choose your target language (French, English, Russian or Ukrainian). The source language is automatically excluded from the list.
+3. **Translation language** — choose your target language (French, English, Russian or Ukrainian). You can also select the same language as the stream for live transcription without translation.
 4. **Channel name** — enter a Twitch channel name and press **+**
 
 A subtitle overlay appears on your screen for that channel.
