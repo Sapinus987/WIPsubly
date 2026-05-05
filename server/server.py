@@ -69,6 +69,18 @@ def _load_deepl_key() -> str:
 
 DEEPL_KEY = _load_deepl_key()
 
+# ── Blacklist hallucinations Whisper ──────────────────────────────────────────
+# Phrases que Whisper génère fréquemment par hallucination sur les streams
+_HALLUCINATIONS = [
+    "dimatorzok", "субтитры", "субтитр", "редактор",
+    "amara.org", "sous-titres par", "subtitles by",
+    "translated by", "translation by", "transcribed by",
+]
+
+def _is_hallucination(text: str) -> bool:
+    low = text.lower()
+    return any(h in low for h in _HALLUCINATIONS)
+
 # ── Globals ────────────────────────────────────────────────────────────────────
 _whisper  = None
 _deepl    = None
@@ -192,11 +204,12 @@ class ChannelSession:
             segs, _ = _whisper.transcribe(
                 audio, language=self._whisper_lang,
                 beam_size=1,
+                condition_on_previous_text=False,
                 vad_filter=True,
                 vad_parameters={"threshold": 0.5},
             )
             src_text = " ".join(s.text for s in segs if s.no_speech_prob < 0.6).strip()
-            if not src_text:
+            if not src_text or _is_hallucination(src_text):
                 continue
 
             try:
