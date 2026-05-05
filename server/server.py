@@ -75,6 +75,7 @@ _HALLUCINATIONS = [
     "dimatorzok", "субтитры", "субтитр", "редактор",
     "amara.org", "sous-titres par", "subtitles by",
     "translated by", "translation by", "transcribed by",
+    "la suite se trouve", "suite à l'adresse",
 ]
 
 def _is_hallucination(text: str) -> bool:
