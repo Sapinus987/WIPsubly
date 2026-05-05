@@ -54,7 +54,18 @@ Twitch stream
 
 ---
 
-## Step 1 — Get a free DeepL API key
+## Step 1 — Clone the repository
+
+```bat
+git clone https://github.com/Sapinus987/WIPsubly.git
+cd WIPsubly
+```
+
+> If you don't have Git installed, download it at **[git-scm.com](https://git-scm.com/downloads)**.
+
+---
+
+## Step 2 — Get a free DeepL API key
 
 Subly uses [DeepL](https://www.deepl.com) for translation. The **free plan gives 1,000,000 characters per year**, which is more than enough for personal use.
 
@@ -78,7 +89,7 @@ server/
 
 ---
 
-## Step 2 — Install the server
+## Step 3 — Install the server
 
 Run this once on the machine that has the GPU:
 
@@ -93,7 +104,7 @@ The Whisper model (~3 GB) will be downloaded on the **first launch** of the serv
 
 ---
 
-## Step 3 — Install the client
+## Step 4 — Install the client
 
 Run this once on the machine that will display the subtitles (can be the same machine):
 
@@ -104,7 +115,7 @@ install.bat
 
 ---
 
-## Step 4 — Start the server
+## Step 5 — Start the server
 
 ```bat
 cd server
@@ -120,7 +131,7 @@ INFO:     Uvicorn running on http://0.0.0.0:8765
 
 ---
 
-## Step 5 — Start the client
+## Step 6 — Start the client
 
 ```bat
 cd client
@@ -131,7 +142,7 @@ The control panel opens. The interface language is automatically set based on yo
 
 ---
 
-## Step 6 — Add a channel
+## Step 7 — Add a channel
 
 1. **Server field** — leave `ws://localhost:8765` if the server is on the same machine. If on another machine, replace `localhost` with its local IP address (e.g. `ws://192.168.1.10:8765`)
 2. **Stream language** — choose the language spoken on the stream (Russian, Ukrainian, English or French)
