@@ -42,15 +42,17 @@ Twitch stream
 | GPU | NVIDIA (CUDA-compatible) |
 | VRAM | 2 GB |
 | RAM | 8 GB |
-| Python | [3.10 or higher](https://www.python.org/downloads/) |
+| Python | [3.10 – 3.12](https://www.python.org/downloads/) (recommended) |
 | Internet | Required (Twitch + DeepL API) |
 
 ### Client machine
 | | Minimum |
 |-|---------|
 | OS | Windows, macOS or Linux |
-| Python | [3.10 or higher](https://www.python.org/downloads/) |
+| Python | [3.10 – 3.12](https://www.python.org/downloads/) (recommended) |
 | GPU | Not required |
+
+> ⚠️ **Python 3.13+ is not recommended** — some dependencies may not yet support it and will fail to install.
 
 ---
 
@@ -197,6 +199,9 @@ Subly/
 
 **"deepl.key not found" error**  
 → Create the file `server/deepl.key` and paste your DeepL API key inside.
+
+**"No module named 'deepl'" or similar import error on startup**  
+→ A dependency failed to install, likely due to an unsupported Python version. Make sure you are using **Python 3.10 to 3.12**. Then delete the `server/env/` folder and re-run `install.bat`.
 
 **The server crashes on startup**  
 → Make sure your NVIDIA drivers are up to date and that CUDA is available (`nvidia-smi` in a terminal).
