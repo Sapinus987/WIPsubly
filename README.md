@@ -80,13 +80,15 @@ Subly uses [DeepL](https://www.deepl.com) for translation. The **free plan gives
 
 **Save your key:**
 
-Create a file named `deepl.key` inside the `server/` folder and paste your key on a single line:
+Open a terminal inside the `server/` folder and run this command (replace with your actual key):
 
-```
-server/
-└── deepl.key   ← create this file and paste your key inside
+```bat
+echo xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx:fx > deepl.key
 ```
 
+This creates the file `server/deepl.key` with your key inside.
+
+> ⚠️ **Do not use Notepad** to create this file — Windows may silently save it as `deepl.key.txt`, which Subly won't find.  
 > ⚠️ Never share this file or upload it anywhere. It is excluded from version control by `.gitignore`.
 
 ---
