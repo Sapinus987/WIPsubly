@@ -24,6 +24,7 @@ import uvicorn
 
 # ── DLL CUDA (Whisper / CTranslate2) ──────────────────────────────────────────
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 _VENV_SITE = os.path.join(sys.prefix, "Lib", "site-packages")
 for _dll_dir in (
     os.path.join(_VENV_SITE, "ctranslate2"),
