@@ -3,8 +3,8 @@
 Real-time subtitle overlay for Twitch streams.  
 Subly listens to a stream, transcribes the speech with Whisper and translates it with DeepL — all displayed in a floating window on your screen.
 
-**Supported input languages:** Russian 🇷🇺, Ukrainian 🇺🇦, English 🇬🇧, French 🇫🇷  
-**Supported output languages:** French 🇫🇷, English 🇬🇧, Russian 🇷🇺, Ukrainian 🇺🇦
+**Supported input languages:** Russian 🇷🇺, Ukrainian 🇺🇦, English 🇬🇧, French 🇫🇷, Spanish 🇪🇸, Portuguese 🇧🇷🇵🇹  
+**Supported output languages:** French 🇫🇷, English 🇬🇧, Russian 🇷🇺, Ukrainian 🇺🇦, Spanish 🇪🇸, Portuguese BR 🇧🇷, Portuguese PT 🇵🇹
 
 Any combination is supported — including same language input/output for live transcription (e.g. French → French for hearing-impaired viewers).
 
@@ -151,8 +151,8 @@ The control panel opens. The interface language is automatically set based on yo
 ## Step 7 — Add a channel
 
 1. **Server field** — leave `ws://localhost:8765` if the server is on the same machine. If on another machine, replace `localhost` with its local IP address (e.g. `ws://192.168.1.10:8765`)
-2. **Stream language** — choose the language spoken on the stream (Russian, Ukrainian, English or French)
-3. **Translation language** — choose your target language (French, English, Russian or Ukrainian). You can also select the same language as the stream for live transcription without translation.
+2. **Stream language** — choose the language spoken on the stream (Russian, Ukrainian, English, French, Spanish or Portuguese)
+3. **Translation language** — choose your target language. You can also select the same language as the stream for live transcription without translation.
 4. **Channel name** — enter a Twitch channel name and press **+**
 
 A subtitle overlay appears on your screen for that channel.

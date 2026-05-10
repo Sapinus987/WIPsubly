@@ -181,7 +181,7 @@ class OverlayWindow(QWidget):
             Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setMinimumSize(340, 70)
-        self.resize(860, 130)
+        self.resize(860, 132)
         self._build(font_size)
 
     def _build(self, font_size: int):
@@ -279,14 +279,19 @@ SOURCE_LANGUAGES = {
     "Українська": ("uk", "UK"),
     "English":    ("en", "EN"),
     "Français":   ("fr", "FR"),
+    "Español":    ("es", "ES"),
+    "Português":  ("pt", "PT"),
 }
 
 # Langues cibles : label → code DeepL cible
 TARGET_LANGUAGES = {
-    "Français":   "FR",
-    "English":    "EN-US",
-    "Русский":    "RU",
-    "Українська": "UK",
+    "Français":        "FR",
+    "English":         "EN-US",
+    "Русский":         "RU",
+    "Українська":      "UK",
+    "Español":         "ES",
+    "Português (BR)":  "PT-BR",
+    "Português (PT)":  "PT-PT",
 }
 
 class WebSocketSession(QObject):

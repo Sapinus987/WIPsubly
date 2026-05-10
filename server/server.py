@@ -127,7 +127,7 @@ app = FastAPI(title="Subly Server", lifespan=lifespan)
 # ══════════════════════════════════════════════════════════════════════════════
 class ChannelSession:
     # Correspondance DeepL source → code Whisper
-    _DEEPL_TO_WHISPER = {"RU": "ru", "UK": "uk", "EN": "en", "FR": "fr"}
+    _DEEPL_TO_WHISPER = {"RU": "ru", "UK": "uk", "EN": "en", "FR": "fr", "ES": "es", "PT": "pt"}
 
     def __init__(self, channel: str, source_lang: str = "RU", target_lang: str = "FR"):
         self.channel     = channel
