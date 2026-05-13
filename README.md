@@ -3,8 +3,8 @@
 Real-time subtitle overlay for Twitch streams.  
 Subly listens to a stream, transcribes the speech with Whisper and translates it with DeepL — all displayed in a floating window on your screen.
 
-**Supported input languages:** Russian 🇷🇺, Ukrainian 🇺🇦, English 🇬🇧, French 🇫🇷, Spanish 🇪🇸, Portuguese 🇧🇷🇵🇹  
-**Supported output languages:** French 🇫🇷, English 🇬🇧, Russian 🇷🇺, Ukrainian 🇺🇦, Spanish 🇪🇸, Portuguese BR 🇧🇷, Portuguese PT 🇵🇹
+**Supported input languages:** Russian 🇷🇺, Ukrainian 🇺🇦, English 🇬🇧, French 🇫🇷, Spanish 🇪🇸, Portuguese 🇧🇷🇵🇹, Swedish 🇸🇪, Finnish 🇫🇮  
+**Supported output languages:** French 🇫🇷, English 🇬🇧, Russian 🇷🇺, Ukrainian 🇺🇦, Spanish 🇪🇸, Portuguese BR 🇧🇷, Portuguese PT 🇵🇹, Swedish 🇸🇪, Finnish 🇫🇮
 
 Any combination is supported — including same language input/output for live transcription (e.g. French → French for hearing-impaired viewers).
 

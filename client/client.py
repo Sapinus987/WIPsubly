@@ -281,6 +281,8 @@ SOURCE_LANGUAGES = {
     "Français":   ("fr", "FR"),
     "Español":    ("es", "ES"),
     "Português":  ("pt", "PT"),
+    "Svenska":    ("sv", "SV"),
+    "Suomi":      ("fi", "FI"),
 }
 
 # Langues cibles : label → code DeepL cible
@@ -292,6 +294,8 @@ TARGET_LANGUAGES = {
     "Español":         "ES",
     "Português (BR)":  "PT-BR",
     "Português (PT)":  "PT-PT",
+    "Svenska":         "SV",
+    "Suomi":           "FI",
 }
 
 class WebSocketSession(QObject):
